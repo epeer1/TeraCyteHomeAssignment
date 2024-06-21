@@ -10,7 +10,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HistogramModel\Tera.HistogramModel.csproj" />
-    <ProjectReference Include="..\Tera.UpdatedImageModel\Tera.UpdatedImageModel.csproj" />
+    <ProjectReference Include="..\ImageModel\Tera.ImageModel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NewFolder\" />
   </ItemGroup>
 
 </Project>

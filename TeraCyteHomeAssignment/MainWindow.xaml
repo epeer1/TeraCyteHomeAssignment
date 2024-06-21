@@ -3,12 +3,82 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:TeraCyteHomeAssignment"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <StackPanel x:Name="LoadImageStackPanel" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-        <Button>
-
-        </Button>
-    </StackPanel>
+        Title="MainWindow" 
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MainUI;component/Resources/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="200"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <!-- Image display -->
+        <Border Grid.Column="0" Grid.Row="0" 
+                BorderBrush="Gray" BorderThickness="1" 
+                HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <ScrollViewer x:Name="ImageScrollViewer" 
+                          HorizontalScrollBarVisibility="Auto" 
+                          VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <Image x:Name="DisplayImage"
+                           Source="{Binding ImageViewModel.Image}" 
+                           Stretch="None" 
+                           HorizontalAlignment="Left" 
+                           VerticalAlignment="Top">
+                        <Image.RenderTransform>
+                            <ScaleTransform x:Name="ImageScale" ScaleX="1" ScaleY="1"/>
+                        </Image.RenderTransform>
+                    </Image>
+                    <TextBlock Text="Loading image..." 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               Visibility="{Binding ImageViewModel.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </Grid>
+            </ScrollViewer>
+        </Border>
+        <!-- Histogram display -->
+        <Border Grid.Column="0" Grid.Row="1" 
+                BorderBrush="Gray" BorderThickness="1" 
+                Margin="0,10,0,0">
+            <Grid>
+                <Image Source="{Binding HistogramViewModel.HistogramImage}" Stretch="Fill"/>
+                <TextBlock Text="Generating histogram..." 
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"
+                           Visibility="{Binding HistogramViewModel.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
+        </Border>
+        <!-- Slider for brightness control -->
+        <StackPanel Orientation="Vertical" Grid.Column="1" Grid.Row="0" VerticalAlignment="Center" Margin="10">
+            <TextBlock Text="Brightness" HorizontalAlignment="Center"/>
+            <Slider x:Name="BrightnessSlider" Minimum="0" Maximum="2" Value="1"
+                    TickFrequency="0.1" IsSnapToTickEnabled="True"
+                    Orientation="Vertical" Width="30" Height="100"
+                    ValueChanged="BrightnessSlider_ValueChanged"
+                    IsEnabled="{Binding ImageViewModel.EnableSlider}"/>
+        </StackPanel>
+        <!-- Zoom controls and other buttons -->
+        <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Vertical" Margin="10,0,0,0">
+            <Button Content="+" Width="30" Height="30" Margin="0,0,0,5" Click="ZoomIn_Click"/>
+            <Button Content="-" Width="30" Height="30" Click="ZoomOut_Click"/>
+        </StackPanel>
+        <StackPanel Grid.Column="0" Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+            <Button Content="Load Image" 
+                    Command="{Binding ImageViewModel.LoadImageCommand}"
+                    Margin="0,0,10,0"/>
+            <Button Content="Reset Zoom" Click="ResetZoom_Click"/>
+        </StackPanel>
+    </Grid>
 </Window>
