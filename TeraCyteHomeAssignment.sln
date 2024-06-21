@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34723.18
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeraCyteHomeAssignment", "TeraCyteHomeAssignment\TeraCyteHomeAssignment.csproj", "{B6F6AF37-977F-467F-8FB0-DFE569417199}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MainUI", "TeraCyteHomeAssignment\MainUI.csproj", "{B6F6AF37-977F-467F-8FB0-DFE569417199}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageModel", "ImageModel\ImageModel.csproj", "{5CC3822A-15D0-4ECA-BD2A-ECEECBB581A4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HistogramModel", "HistogramModel\HistogramModel.csproj", "{24066919-E031-45F0-B034-69DF5A51BD53}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{B6F6AF37-977F-467F-8FB0-DFE569417199}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B6F6AF37-977F-467F-8FB0-DFE569417199}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B6F6AF37-977F-467F-8FB0-DFE569417199}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5CC3822A-15D0-4ECA-BD2A-ECEECBB581A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5CC3822A-15D0-4ECA-BD2A-ECEECBB581A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5CC3822A-15D0-4ECA-BD2A-ECEECBB581A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5CC3822A-15D0-4ECA-BD2A-ECEECBB581A4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24066919-E031-45F0-B034-69DF5A51BD53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24066919-E031-45F0-B034-69DF5A51BD53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24066919-E031-45F0-B034-69DF5A51BD53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24066919-E031-45F0-B034-69DF5A51BD53}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
