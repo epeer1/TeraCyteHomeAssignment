@@ -11,7 +11,7 @@ namespace Tera.UpdatedImageModel
 		public void LoadImage(string path)
 		{
 			ImagePath = path;
-			_mat = Cv2.ImRead(path, ImreadModes.Color);
+			_mat = Cv2.ImRead(path, ImreadModes.Color);	//Efficient reading
 		}
 
 		public Mat GetMat()

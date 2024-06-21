@@ -81,17 +81,20 @@ namespace MainUI.ViewModels
 			}
 		}
 
-		private void AdjustBrightness()
+		private async Task AdjustBrightness()
 		{
 			if (_originalImage != null)
 			{
 				EnableSlider = false;
 				using (var mat = _originalImage.ToMat())
 				{
-					// Apply brightness adjustment
 					Mat adjustedMat = new Mat();
-					mat.ConvertTo(adjustedMat, -1, Brightness, 0); // Brightness adjustment
-
+					await Task.Run(
+						() =>
+							{
+								mat.ConvertTo(adjustedMat, -1, Brightness, 0); // Brightness adjustment
+							});
+					// Apply brightness adjustment
 					Image = adjustedMat.ToBitmapSource();
 				}
 				EnableSlider = true;
@@ -128,7 +131,7 @@ namespace MainUI.ViewModels
 						IsLoading = false;
 						EnableSlider = true;
 						OnPropertyChanged(nameof(ImagePath));
-						ResetImageDimensions(); // Reset image dimensions to auto
+						//ResetImageDimensions(); // Reset image dimensions to auto
 					});
 				}
 				catch (Exception ex)
@@ -140,17 +143,6 @@ namespace MainUI.ViewModels
 					});
 				}
 			}
-		}
-
-		private void ResetImageDimensions()
-		{
-			Application.Current.Dispatcher.Invoke(() =>
-			{
-				if (Application.Current.MainWindow is MainWindow mainWindow)
-				{
-					mainWindow.ResetImageDimensions();
-				}
-			});
 		}
 
 		public void Dispose()

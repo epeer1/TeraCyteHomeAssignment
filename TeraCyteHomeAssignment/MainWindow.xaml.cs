@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Media.Imaging;
 using MainUI.ViewModels;
 
 namespace MainUI
@@ -29,7 +30,6 @@ namespace MainUI
 		{
 			ImageScale.ScaleX = 1;
 			ImageScale.ScaleY = 1;
-			UpdateScrollViewer();
 		}
 
 		private void ApplyZoom(double factor)
@@ -39,7 +39,6 @@ namespace MainUI
 			{
 				ImageScale.ScaleX *= factor;
 				ImageScale.ScaleY *= factor;
-				UpdateScrollViewer();
 			}
 		}
 
@@ -51,18 +50,22 @@ namespace MainUI
 			}
 		}
 
-		private void UpdateScrollViewer()
+		private void IncreaseBrightness_Click(object sender, RoutedEventArgs e)
 		{
-			DisplayImage.Width = DisplayImage.Source.Width * ImageScale.ScaleX;
-			DisplayImage.Height = DisplayImage.Source.Height * ImageScale.ScaleY;
-			ImageScrollViewer.UpdateLayout();
+			if (BrightnessSlider.Value < BrightnessSlider.Maximum)
+			{
+				BrightnessSlider.Value += 0.1;
+			}
 		}
 
-		public void ResetImageDimensions()
+		private void DecreaseBrightness_Click(object sender, RoutedEventArgs e)
 		{
-			DisplayImage.Width = double.NaN;
-			DisplayImage.Height = double.NaN;
-			UpdateScrollViewer();
+			if (BrightnessSlider.Value > BrightnessSlider.Minimum)
+			{
+				BrightnessSlider.Value -= 0.1;
+			}
 		}
+
+
 	}
 }
