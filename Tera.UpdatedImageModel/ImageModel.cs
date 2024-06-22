@@ -68,6 +68,8 @@ namespace Tera.UpdatedImageModel
 			_originalImage = image.Clone(); // Clone to avoid modifying the original image
 		}
 
+		//All the Histogram calculations are from AI generator
+
 		public void CalculateAndCreateHistogram(Mat image)
 		{
 			var histograms = CalculateHistogram(image);

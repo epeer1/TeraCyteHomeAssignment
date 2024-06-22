@@ -68,7 +68,7 @@ namespace MainUI.ViewModels
 				{
 					_brightness = value;
 					OnPropertyChanged(nameof(Brightness));
-					AdjustBrightness();
+					_ = AdjustBrightness();
 				}
 			}
 		}
@@ -136,7 +136,7 @@ namespace MainUI.ViewModels
 					// Apply brightness adjustment
 					Image = adjustedMat.ToBitmapSource();
 
-					Task.Run(() => _imageModel.SetMatAndUpdateHistogram(adjustedMat));
+					Task.Run(() => _imageModel.SetMatAndUpdateHistogram(adjustedMat));	//Background thread, not need to wait
 				}
 			}
 		}

@@ -3,7 +3,7 @@ using System.Windows.Input;
 
 namespace MainUI.Commands
 {
-	public class RelayCommand : ICommand
+	public class RelayCommand : ICommand	//Enhanced ICommand class
 	{
 		private readonly Action _execute;
 		private readonly Func<bool> _canExecute;

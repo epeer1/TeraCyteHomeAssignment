@@ -5,7 +5,7 @@ using System.Windows.Threading;
 
 namespace MainUI.ViewModels
 {
-	public class ViewModelBase : INotifyPropertyChanged
+	public class ViewModelBase : INotifyPropertyChanged	//ViewModelBase class to wrap the property change events ensure called from UI main thread
 	{
 		public event PropertyChangedEventHandler PropertyChanged;
 
