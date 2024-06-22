@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HistogramModel\Tera.HistogramModel.csproj" />
     <ProjectReference Include="..\Tera.UpdatedImageModel\Tera.UpdatedImageModel.csproj" />
   </ItemGroup>
 

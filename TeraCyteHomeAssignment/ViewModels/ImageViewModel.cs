@@ -15,15 +15,20 @@ namespace MainUI.ViewModels
 	{
 		private readonly ImageModel _imageModel;
 		private bool _isLoading;
+		private bool _isLoadingHistogram;
 		private BitmapSource _image;
 		private BitmapSource _originalImage; // Store the original image
 		private double _brightness = 1.0;
-		private bool _enableSlider = false;
+		private bool _enableBrightnessSlider = false;
+		private BitmapSource _histogramImage;
 
 		public ImageViewModel()
 		{
 			_imageModel = new ImageModel();
 			LoadImageCommand = new RelayCommand(async () => await LoadImageAsync());
+
+			_imageModel.HistogramUpdated += OnHistogramUpdated;
+
 		}
 
 		public ICommand LoadImageCommand { get; }
@@ -68,24 +73,58 @@ namespace MainUI.ViewModels
 			}
 		}
 
-		public bool EnableSlider
+		public bool EnableBrightnessSlider
 		{
-			get => _enableSlider;
+			get => _enableBrightnessSlider;
 			set
 			{
-				if (_enableSlider != value)
+				if (_enableBrightnessSlider != value)
 				{
-					_enableSlider = value;
-					OnPropertyChanged(nameof(EnableSlider));
+					_enableBrightnessSlider = value;
+					OnPropertyChanged(nameof(EnableBrightnessSlider));
 				}
 			}
+		}
+
+		public BitmapSource HistogramImage
+		{
+			get => _histogramImage;
+			set
+			{
+				_histogramImage = value;
+				OnPropertyChanged(nameof(HistogramImage));
+			}
+		}
+
+		public bool IsLoadingHistogram
+		{
+			get => _isLoadingHistogram;
+			set
+			{
+				if (_isLoadingHistogram != value)
+				{
+					_isLoadingHistogram = value;
+					OnPropertyChanged(nameof(IsLoadingHistogram));
+				}
+			}
+		}
+
+		private void OnHistogramUpdated(object sender, EventArgs e)
+		{
+			Application.Current.Dispatcher.Invoke(() =>	//MainUI thread
+				{
+					IsLoadingHistogram = true;
+					HistogramImage = _imageModel.GetCloneHistogram();
+					IsLoadingHistogram = false;
+					EnableBrightnessSlider = true;
+				});
 		}
 
 		private async Task AdjustBrightness()
 		{
 			if (_originalImage != null)
 			{
-				EnableSlider = false;
+				EnableBrightnessSlider = false;
 				using (var mat = _originalImage.ToMat())
 				{
 					Mat adjustedMat = new Mat();
@@ -96,53 +135,60 @@ namespace MainUI.ViewModels
 							});
 					// Apply brightness adjustment
 					Image = adjustedMat.ToBitmapSource();
+
+					Task.Run(() => _imageModel.SetMatAndUpdateHistogram(adjustedMat));
 				}
-				EnableSlider = true;
 			}
 		}
-
-		public string ImagePath => _imageModel.ImagePath;
 
 		private async Task LoadImageAsync()
 		{
 			OpenFileDialog openFileDialog = new OpenFileDialog
-			{
-				Filter = "Image files (*.bmp, *.jpg, *.jpeg, *.png)|*.bmp;*.jpg;*.jpeg;*.png",
-				Title = "Select an Image"
-			};
+				                                {
+					                                Filter = "Image files (*.bmp, *.jpg, *.jpeg, *.png)|*.bmp;*.jpg;*.jpeg;*.png",
+					                                Title = "Select an Image"
+				                                };
 
 			if (openFileDialog.ShowDialog() == true)
 			{
 				IsLoading = true;
-				EnableSlider = false;
+				EnableBrightnessSlider = false;
 				string fileName = openFileDialog.FileName;
 
 				try
 				{
-					await Task.Run(() => _imageModel.LoadImage(fileName));
+					var tempMat = await Task.Run(() => LoadImage(fileName));
 
-					await Application.Current.Dispatcher.InvokeAsync(() =>
-					{
-						using (var mat = _imageModel.GetMat())
+					await Application.Current.Dispatcher.InvokeAsync(() =>	//Update UI before updating Model
 						{
-							_originalImage = mat.ToBitmapSource(); // Store the original image
-							Image = _originalImage; // Display the original image initially
-						}
-						IsLoading = false;
-						EnableSlider = true;
-						OnPropertyChanged(nameof(ImagePath));
-						//ResetImageDimensions(); // Reset image dimensions to auto
-					});
+							using (var mat = tempMat.Clone())
+							{
+								_originalImage = mat.ToBitmapSource(); // Store the original image
+								Image = _originalImage; // Display the original image initially
+							}
+							IsLoading = false;
+							EnableBrightnessSlider = true;
+						});
+
+					Task.Run(() => _imageModel.SetMatAndUpdateHistogram(tempMat));	//Updating Model
 				}
 				catch (Exception ex)
 				{
 					await Application.Current.Dispatcher.InvokeAsync(() =>
-					{
-						MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-						IsLoading = false;
-					});
+						{
+							MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+							IsLoading = false;
+						});
 				}
 			}
+		}
+
+
+
+		private Mat LoadImage(string fileName)
+		{
+			var _mat = Cv2.ImRead(fileName, ImreadModes.Color); //Efficient reading
+			return _mat;
 		}
 
 		public void Dispose()
