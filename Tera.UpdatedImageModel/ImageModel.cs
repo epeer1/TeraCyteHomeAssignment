@@ -1,10 +1,11 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using OpenCvSharp;
+using OpenCvSharp.WpfExtensions;
 
 namespace Tera.UpdatedImageModel
 {
@@ -12,32 +13,72 @@ namespace Tera.UpdatedImageModel
 	{
 		public string ImagePath { get; private set; }
 		private Mat _mat;
-		private ImageHistogramModel _histogramModel;
+		private readonly object _lockObject = new object();
+		private readonly Lazy<ImageHistogramModel> _histogramModel;
 
-		public event EventHandler HistogramUpdated;
+		public event EventHandler<HistogramUpdatedEventArgs> HistogramUpdated;
 
-		public void SetMatAndUpdateHistogram(Mat mat) // called from background thread
+		public ImageModel()
 		{
-			_mat?.Dispose(); // Dispose the previous Mat if it exists
-			_mat = mat.Clone();
-			_histogramModel ??= new ImageHistogramModel(_mat);	//create new only if null
-			UpdateHistogram();
+			_histogramModel = new Lazy<ImageHistogramModel>(() => new ImageHistogramModel());
 		}
 
-		public void UpdateHistogram()
+		public async Task SetMatAndUpdateHistogramAsync(Mat mat)
 		{
-			_histogramModel.CalculateAndCreateHistogram(_mat); // called from background thread
-			OnHistogramUpdated();
+			await Task.Run(() =>
+			{
+				lock (_lockObject)
+				{
+					_mat?.Dispose();
+					_mat = mat.Clone();
+				}
+			});
+			await UpdateHistogramAsync();
+		}
+
+		public async Task UpdateHistogramAsync()
+		{
+			BitmapSource histogramImage = null;
+			await Task.Run(() =>
+			{
+				lock (_lockObject)
+				{
+					_histogramModel.Value.CalculateAndCreateHistogram(_mat);
+					histogramImage = _histogramModel.Value.GetHistogramImageClone();
+				}
+			});
+			OnHistogramUpdated(histogramImage);
 		}
 
 		public BitmapSource GetCloneHistogram()
 		{
-			return _histogramModel.GetHistogramImageClone();
+			lock (_lockObject)
+			{
+				return _histogramModel.Value.GetHistogramImageClone();
+			}
 		}
 
-		protected virtual void OnHistogramUpdated()
+		protected virtual void OnHistogramUpdated(BitmapSource histogramImage)
 		{
-			HistogramUpdated?.Invoke(this, EventArgs.Empty);
+			HistogramUpdated?.Invoke(this, new HistogramUpdatedEventArgs(histogramImage));
+		}
+
+		public async Task<byte[]> GetHistogramAsByteArrayAsync()
+		{
+			BitmapSource histogramSource = GetCloneHistogram();
+			if (histogramSource == null)
+				return null;
+
+			return await Task.Run(() =>
+			{
+				using (var ms = new MemoryStream())
+				{
+					var encoder = new PngBitmapEncoder();
+					encoder.Frames.Add(BitmapFrame.Create(histogramSource));
+					encoder.Save(ms);
+					return ms.ToArray();
+				}
+			});
 		}
 
 		public void Dispose()
@@ -46,46 +87,43 @@ namespace Tera.UpdatedImageModel
 			GC.SuppressFinalize(this);
 		}
 
-		public byte[] GetHistogramAsByteArray()
-		{
-			BitmapSource histogramSource = GetCloneHistogram();
-			if (histogramSource == null)
-				return null;
-
-			PngBitmapEncoder encoder = new PngBitmapEncoder();
-			encoder.Frames.Add(BitmapFrame.Create(histogramSource));
-
-			using (MemoryStream ms = new MemoryStream())
-			{
-				encoder.Save(ms);
-				return ms.ToArray();
-			}
-		}
-
 		protected virtual void Dispose(bool disposing)
 		{
 			if (disposing)
 			{
-				_mat?.Dispose();
-				_histogramModel?.Dispose();
+				lock (_lockObject)
+				{
+					_mat?.Dispose();
+					if (_histogramModel.IsValueCreated)
+					{
+						_histogramModel.Value.Dispose();
+					}
+				}
 			}
+		}
+
+		~ImageModel()
+		{
+			Dispose(false);
 		}
 	}
 
+	public class HistogramUpdatedEventArgs : EventArgs
+	{
+		public BitmapSource HistogramImage { get; }
+
+		public HistogramUpdatedEventArgs(BitmapSource histogramImage)
+		{
+			HistogramImage = histogramImage;
+		}
+	}
 
 	public class ImageHistogramModel : IDisposable
 	{
 		private const int HISTOGRAM_WIDTH = 256;
 		private const int HISTOGRAM_HEIGHT = 200;
-		private Mat _originalImage;
 		private BitmapSource _histogramImage = null;
-
-		public ImageHistogramModel(Mat image)
-		{
-			_originalImage = image.Clone(); // Clone to avoid modifying the original image
-		}
-
-		//All the Histogram calculations are from AI generator
+		private readonly object _lockObject = new object();
 
 		public void CalculateAndCreateHistogram(Mat image)
 		{
@@ -140,22 +178,11 @@ namespace Tera.UpdatedImageModel
 				DrawHistogram(histImage, histograms.Green, new Scalar(0, 255, 0)); // Green
 				DrawHistogram(histImage, histograms.Blue, new Scalar(255, 0, 0));  // Blue
 
-				// Convert Mat to byte array
-				var imageData = new byte[histImage.Total() * histImage.ElemSize()];
-				Marshal.Copy(histImage.Data, imageData, 0, imageData.Length);
-
-				int bytesPerPixel = histImage.ElemSize();
-				int stride = HISTOGRAM_WIDTH * bytesPerPixel;
-				int expectedBufferSize = stride * HISTOGRAM_HEIGHT;
-
-				if (imageData.Length < expectedBufferSize)
+				lock (_lockObject)
 				{
-					throw new ArgumentException($"Buffer size is not sufficient. Expected: {expectedBufferSize}, Actual: {imageData.Length}");
+					_histogramImage = histImage.ToBitmapSource();
+					_histogramImage.Freeze(); // Make it immutable for thread-safety
 				}
-
-				_histogramImage = BitmapSource.Create(
-					HISTOGRAM_WIDTH, HISTOGRAM_HEIGHT, 96, 96, PixelFormats.Bgr24, null, imageData, stride);
-				_histogramImage.Freeze(); // Make it immutable for thread-safety
 			}
 		}
 
@@ -167,7 +194,7 @@ namespace Tera.UpdatedImageModel
 				int height = (int)((histogram[i] / (double)max) * HISTOGRAM_HEIGHT);
 				Cv2.Line(
 					histImage,
-					new Point(i, HISTOGRAM_WIDTH),
+					new Point(i, HISTOGRAM_HEIGHT),
 					new Point(i, HISTOGRAM_HEIGHT - height),
 					color
 				);
@@ -176,10 +203,10 @@ namespace Tera.UpdatedImageModel
 
 		public BitmapSource GetHistogramImageClone()
 		{
-			if (_histogramImage == null)
-				return null;
-
-			return new FormatConvertedBitmap(_histogramImage, _histogramImage.Format, null, 0);
+			lock (_lockObject)
+			{
+				return _histogramImage?.Clone();
+			}
 		}
 
 		public void Dispose()
@@ -192,9 +219,16 @@ namespace Tera.UpdatedImageModel
 		{
 			if (disposing)
 			{
-				_originalImage?.Dispose();
+				lock (_lockObject)
+				{
+					_histogramImage = null;
+				}
 			}
 		}
-	}
 
+		~ImageHistogramModel()
+		{
+			Dispose(false);
+		}
+	}
 }

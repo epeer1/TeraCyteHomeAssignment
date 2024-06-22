@@ -141,7 +141,7 @@ namespace MainUI.ViewModels
 					{
 						var adjustedMat = await _brightnessManager.AdjustBrightnessAsync(mat);
 						Image = adjustedMat.ToBitmapSource();
-						await Task.Run(() => _imageModel.SetMatAndUpdateHistogram(adjustedMat));
+						await Task.Run(() => _imageModel.SetMatAndUpdateHistogramAsync(adjustedMat));
 					}
 				}
 				catch (Exception ex)

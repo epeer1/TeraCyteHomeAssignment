@@ -110,61 +110,48 @@ namespace MainUI.ViewModels
 					                     Title = "Select an Image"
 				                     };
 
-			if (openFileDialog.ShowDialog() != true) return null;
+			if(openFileDialog.ShowDialog() != true) return null;
 
 			string fileName = openFileDialog.FileName;
 
 			try
 			{
-				return await Task.Run(() =>
-					{
-						using (var mat = Cv2.ImRead(fileName, ImreadModes.Color))
-						{
-							if (mat.Empty())
-							{
-								throw new Exception("Failed to load image.");
-							}
+				return await Task.Run(
+					       () =>
+						       {
+							       using(var mat = Cv2.ImRead(fileName, ImreadModes.Color))
+							       {
+								       if(mat.Empty())
+								       {
+									       throw new Exception("Failed to load image.");
+								       }
 
-							_imageModel.SetMatAndUpdateHistogram(mat.Clone());
+								       _imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
 
-							var bitmapSource = mat.ToBitmapSource();
-							bitmapSource.Freeze(); // Make it immutable for thread-safety
+								       var bitmapSource = mat.ToBitmapSource();
+								       bitmapSource.Freeze(); // Make it immutable for thread-safety
 
-							Application.Current.Dispatcher.Invoke(() =>
-								{
-									ImageLoaded?.Invoke(this, bitmapSource);
-								});
+								       Application.Current.Dispatcher.Invoke(
+									       () => { ImageLoaded?.Invoke(this, bitmapSource); });
 
-							return bitmapSource;
-						}
-					});
+								       return bitmapSource;
+							       }
+						       });
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
 				_logger.LogError($"Error loading image: {ex.Message}", ex);
-				Application.Current.Dispatcher.Invoke(() =>
-					{
-						MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-					});
+				Application.Current.Dispatcher.Invoke(
+					() =>
+						{
+							MessageBox.Show(
+								$"Error loading image: {ex.Message}",
+								"Error",
+								MessageBoxButton.OK,
+								MessageBoxImage.Error);
+						});
 				return null;
 			}
-		}
-
-		private Mat BitmapSourceToMat(BitmapSource source)
-		{
-			if (source.Format != PixelFormats.Bgr24)
-			{
-				throw new ArgumentException("BitmapSource must be in Bgr24 format");
-			}
-
-			int width = source.PixelWidth;
-			int height = source.PixelHeight;
-			int stride = width * ((source.Format.BitsPerPixel + 7) / 8);
-
-			byte[] pixels = new byte[height * stride];
-			source.CopyPixels(pixels, stride, 0);
-
-			return Mat.FromImageData(pixels, ImreadModes.Color);
 		}
 	}
 
