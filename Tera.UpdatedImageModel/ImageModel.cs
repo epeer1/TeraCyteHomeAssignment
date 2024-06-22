@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
@@ -43,6 +44,22 @@ namespace Tera.UpdatedImageModel
 		{
 			Dispose(true);
 			GC.SuppressFinalize(this);
+		}
+
+		public byte[] GetHistogramAsByteArray()
+		{
+			BitmapSource histogramSource = GetCloneHistogram();
+			if (histogramSource == null)
+				return null;
+
+			PngBitmapEncoder encoder = new PngBitmapEncoder();
+			encoder.Frames.Add(BitmapFrame.Create(histogramSource));
+
+			using (MemoryStream ms = new MemoryStream())
+			{
+				encoder.Save(ms);
+				return ms.ToArray();
+			}
 		}
 
 		protected virtual void Dispose(bool disposing)
