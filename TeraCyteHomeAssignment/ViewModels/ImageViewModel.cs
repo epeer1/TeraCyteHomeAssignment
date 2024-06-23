@@ -3,25 +3,22 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using Microsoft.Win32;
 using MainUI.Commands;
-using OpenCvSharp.WpfExtensions;
-using Tera.UpdatedImageModel;
 using OpenCvSharp;
-using Tera.NetworkServices;
+using OpenCvSharp.WpfExtensions;
 using System.Runtime.CompilerServices;
+using Tera.UpdatedImageModel;
 
 namespace MainUI.ViewModels
 {
 	public class ImageViewModel : ViewModelBase, IDisposable
 	{
 		private readonly ImageModel _imageModel;
-		private readonly BrightnessManager _brightnessManager;
-		private readonly HistogramManager _histogramManager;
-		private readonly ImageLoader _imageLoader;
-		private readonly CommandManager _commandManager;
+		private readonly IBrightnessManager _brightnessManager;
+		private readonly IHistogramManager _histogramManager;
+		private readonly IImageLoader _imageLoader;
+		private readonly ICommandManager _commandManager;
 		private readonly ILogger _logger;
-
 
 		private BitmapSource _image;
 		private BitmapSource _originalImage;
@@ -30,12 +27,13 @@ namespace MainUI.ViewModels
 		private bool _isLoadingHistogram;
 		private bool _enableBrightnessSlider;
 
-		public ImageViewModel(ImageModel imageModel,
-							  BrightnessManager brightnessManager,
-							  HistogramManager histogramManager,
-							  ImageLoader imageLoader,
-							  CommandManager commandManager,
-							  ILogger logger)
+		public ImageViewModel(
+			ImageModel imageModel,
+			IBrightnessManager brightnessManager,
+			IHistogramManager histogramManager,
+			IImageLoader imageLoader,
+			ICommandManager commandManager,
+			ILogger logger)
 		{
 			_imageModel = imageModel;
 			_brightnessManager = brightnessManager;
@@ -43,7 +41,6 @@ namespace MainUI.ViewModels
 			_imageLoader = imageLoader;
 			_commandManager = commandManager;
 			_logger = logger;
-
 
 			InitializeCommands();
 			SubscribeToEvents();
@@ -121,7 +118,6 @@ namespace MainUI.ViewModels
 			catch (Exception ex)
 			{
 				_logger.LogError("Failed to load image", ex);
-				// Show error message to user
 				MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
 			}
 			finally
@@ -147,7 +143,6 @@ namespace MainUI.ViewModels
 				catch (Exception ex)
 				{
 					_logger.LogError("Failed to adjust brightness", ex);
-					// Show error message to user
 					MessageBox.Show($"Error adjusting brightness: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
 				}
 				finally
@@ -162,32 +157,31 @@ namespace MainUI.ViewModels
 			try
 			{
 				Application.Current.Dispatcher.Invoke(() =>
+				{
+					try
 					{
-						try
-						{
-							IsLoadingHistogram = true;
-							HistogramImage = _histogramManager.GetHistogramImage();
-						}
-						catch (Exception ex)
-						{
-							_logger.LogError("Error updating histogram image on UI thread", ex);
-							MessageBox.Show($"Error updating histogram: {ex.Message}", "Histogram Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
-						}
-						finally
-						{
-							IsLoadingHistogram = false;
-							EnableBrightnessSlider = true;
-						}
-					});
+						IsLoadingHistogram = true;
+						HistogramImage = _histogramManager.GetHistogramImage();
+					}
+					catch (Exception ex)
+					{
+						_logger.LogError("Error updating histogram image on UI thread", ex);
+						MessageBox.Show($"Error updating histogram: {ex.Message}", "Histogram Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					}
+					finally
+					{
+						IsLoadingHistogram = false;
+						EnableBrightnessSlider = true;
+					}
+				});
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError("Failed to invoke histogram update on UI thread", ex);
-				// Since we're potentially not on the UI thread here, we need to use Dispatcher to show the message box
 				Application.Current.Dispatcher.Invoke(() =>
-					{
-						MessageBox.Show("Failed to update histogram. Please try again.", "Histogram Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
-					});
+				{
+					MessageBox.Show("Failed to update histogram. Please try again.", "Histogram Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+				});
 			}
 		}
 

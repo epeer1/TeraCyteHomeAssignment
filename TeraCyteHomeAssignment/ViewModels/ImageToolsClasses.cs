@@ -1,19 +1,25 @@
 ﻿using MainUI.Commands;
 using Microsoft.Win32;
 using OpenCvSharp;
+using System;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using System.Windows;
 using OpenCvSharp.WpfExtensions;
 using Tera.NetworkServices;
 using Tera.UpdatedImageModel;
-using System.IO;
-using System.Windows.Media;
 
 namespace MainUI.ViewModels
 {
-	// BrightnessManager.cs
-	public class BrightnessManager
+	public interface IBrightnessManager
+	{
+		double Brightness { get; set; }
+		event EventHandler OnBrightnessChanged;
+		Task<Mat> AdjustBrightnessAsync(Mat originalMat);
+	}
+
+	public class BrightnessManager : IBrightnessManager
 	{
 		private double _brightness = 1.0;
 
@@ -43,8 +49,14 @@ namespace MainUI.ViewModels
 		}
 	}
 
-	// HistogramManager.cs
-	public class HistogramManager
+	public interface IHistogramManager : IDisposable
+	{
+		event EventHandler HistogramUpdated;
+		BitmapSource GetHistogramImage();
+		Task SendHistogramAsync();
+	}
+
+	public class HistogramManager : IHistogramManager
 	{
 		private readonly ImageModel _imageModel;
 		private readonly HistogramSender _histogramSender;
@@ -69,7 +81,7 @@ namespace MainUI.ViewModels
 			return _imageModel.GetCloneHistogram();
 		}
 
-		private async Task SendHistogramAsync()
+		public async Task SendHistogramAsync()
 		{
 			try
 			{
@@ -88,8 +100,13 @@ namespace MainUI.ViewModels
 		}
 	}
 
-	// ImageLoader.cs
-	public class ImageLoader
+	public interface IImageLoader
+	{
+		event EventHandler<BitmapSource> ImageLoaded;
+		Task<BitmapSource> LoadImageAsync();
+	}
+
+	public class ImageLoader : IImageLoader
 	{
 		private readonly ImageModel _imageModel;
 		private readonly ILogger _logger;
@@ -105,58 +122,58 @@ namespace MainUI.ViewModels
 		public async Task<BitmapSource> LoadImageAsync()
 		{
 			var openFileDialog = new OpenFileDialog
-				                     {
-					                     Filter = "Image files (*.bmp, *.jpg, *.jpeg, *.png)|*.bmp;*.jpg;*.jpeg;*.png",
-					                     Title = "Select an Image"
-				                     };
+			{
+				Filter = "Image files (*.bmp, *.jpg, *.jpeg, *.png)|*.bmp;*.jpg;*.jpeg;*.png",
+				Title = "Select an Image"
+			};
 
-			if(openFileDialog.ShowDialog() != true) return null;
+			if (openFileDialog.ShowDialog() != true) return null;
 
 			string fileName = openFileDialog.FileName;
 
 			try
 			{
-				return await Task.Run(
-					       () =>
-						       {
-							       using(var mat = Cv2.ImRead(fileName, ImreadModes.Color))
-							       {
-								       if(mat.Empty())
-								       {
-									       throw new Exception("Failed to load image.");
-								       }
+				return await Task.Run(() =>
+				{
+					using (var mat = Cv2.ImRead(fileName, ImreadModes.Color))
+					{
+						if (mat.Empty())
+						{
+							throw new ImageProcessingException("Failed to load image.");
+						}
 
-								       _imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
+						_imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
 
-								       var bitmapSource = mat.ToBitmapSource();
-								       bitmapSource.Freeze(); // Make it immutable for thread-safety
+						var bitmapSource = mat.ToBitmapSource();
+						bitmapSource.Freeze(); // Make it immutable for thread-safety
 
-								       Application.Current.Dispatcher.Invoke(
-									       () => { ImageLoaded?.Invoke(this, bitmapSource); });
+						Application.Current.Dispatcher.Invoke(() =>
+						{
+							ImageLoaded?.Invoke(this, bitmapSource);
+						});
 
-								       return bitmapSource;
-							       }
-						       });
+						return bitmapSource;
+					}
+				});
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				_logger.LogError($"Error loading image: {ex.Message}", ex);
-				Application.Current.Dispatcher.Invoke(
-					() =>
-						{
-							MessageBox.Show(
-								$"Error loading image: {ex.Message}",
-								"Error",
-								MessageBoxButton.OK,
-								MessageBoxImage.Error);
-						});
+				Application.Current.Dispatcher.Invoke(() =>
+				{
+					MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+				});
 				return null;
 			}
 		}
 	}
 
-	// CommandManager.cs
-	public class CommandManager
+	public interface ICommandManager
+	{
+		ICommand Create(Action execute, Func<bool> canExecute = null);
+	}
+
+	public class CommandManager : ICommandManager
 	{
 		public ICommand Create(Action execute, Func<bool> canExecute = null)
 		{
@@ -164,7 +181,6 @@ namespace MainUI.ViewModels
 		}
 	}
 
-	//Exception class
 	public class ImageProcessingException : Exception
 	{
 		public ImageProcessingException(string message) : base(message) { }

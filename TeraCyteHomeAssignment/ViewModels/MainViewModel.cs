@@ -11,10 +11,10 @@ public class MainViewModel : ViewModelBase
 	{
 		var logger = new Logger("application.log");
 		var imageModel = new ImageModel();
-		var brightnessManager = new BrightnessManager();
-		var histogramManager = new HistogramManager(imageModel, "https://teraimagefunctionapp.azurewebsites.net");
-		var imageLoader = new ImageLoader(imageModel,logger);
-		var commandManager = new CommandManager();
+		IBrightnessManager brightnessManager = new BrightnessManager();
+		IHistogramManager histogramManager = new HistogramManager(imageModel, "https://teraimagefunctionapp.azurewebsites.net");
+		IImageLoader imageLoader = new ImageLoader(imageModel, logger);
+		ICommandManager commandManager = new CommandManager();
 
 		ImageViewModel = new ImageViewModel(imageModel, brightnessManager, histogramManager, imageLoader, commandManager, logger);
 	}
