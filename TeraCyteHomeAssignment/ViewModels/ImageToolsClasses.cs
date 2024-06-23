@@ -2,6 +2,7 @@
 using Microsoft.Win32;
 using OpenCvSharp;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -122,47 +123,62 @@ namespace MainUI.ViewModels
 		public async Task<BitmapSource> LoadImageAsync()
 		{
 			var openFileDialog = new OpenFileDialog
-			{
-				Filter = "Image files (*.bmp, *.jpg, *.jpeg, *.png)|*.bmp;*.jpg;*.jpeg;*.png",
-				Title = "Select an Image"
-			};
+				                     {
+					                     Filter = "Image files (*.bmp;*.jpg;*.jpeg;*.png)|*.bmp;*.jpg;*.jpeg;*.png",
+					                     Title = "Select an Image"
+				                     };
 
-			if (openFileDialog.ShowDialog() != true) return null;
+			if(openFileDialog.ShowDialog() != true) return null;
 
 			string fileName = openFileDialog.FileName;
+			string extension = Path.GetExtension(fileName).ToLower();
 
 			try
 			{
-				return await Task.Run(() =>
-				{
-					using (var mat = Cv2.ImRead(fileName, ImreadModes.Color))
-					{
-						if (mat.Empty())
-						{
-							throw new ImageProcessingException("Failed to load image.");
-						}
+				return await Task.Run(
+					       () =>
+						       {
+							       Mat mat;
+							       if(extension == ".bmp")
+							       {
+								       // Use method for BMP files
+								       mat = Cv2.ImRead(fileName, ImreadModes.Color);
+							       }
+							       else
+							       {
+								       // Use a more robust method for other formats
+								       byte[] fileBytes = File.ReadAllBytes(fileName);
+								       mat = Mat.FromImageData(fileBytes, ImreadModes.Color);
+							       }
 
-						_imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
+							       if(mat.Empty())
+							       {
+								       throw new Exception("Failed to load image.");
+							       }
 
-						var bitmapSource = mat.ToBitmapSource();
-						bitmapSource.Freeze(); // Make it immutable for thread-safety
+							       _imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
 
-						Application.Current.Dispatcher.Invoke(() =>
-						{
-							ImageLoaded?.Invoke(this, bitmapSource);
-						});
+							       var bitmapSource = mat.ToBitmapSource();
+							       bitmapSource.Freeze(); // Make it immutable for thread-safety
 
-						return bitmapSource;
-					}
-				});
+							       Application.Current.Dispatcher.Invoke(
+								       () => { ImageLoaded?.Invoke(this, bitmapSource); });
+
+							       return bitmapSource;
+						       });
 			}
-			catch (Exception ex)
+			catch(Exception ex)
 			{
-				_logger.LogError($"Error loading image: {ex.Message}", ex);
-				Application.Current.Dispatcher.Invoke(() =>
-				{
-					MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-				});
+				_logger.LogError($"Error loading image: {ex.Message}\nFile: {fileName}", ex);
+				Application.Current.Dispatcher.Invoke(
+					() =>
+						{
+							MessageBox.Show(
+								$"Error loading image: {ex.Message}\nFile: {fileName}",
+								"Error",
+								MessageBoxButton.OK,
+								MessageBoxImage.Error);
+						});
 				return null;
 			}
 		}
