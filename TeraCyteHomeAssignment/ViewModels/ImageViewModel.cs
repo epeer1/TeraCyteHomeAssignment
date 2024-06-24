@@ -51,6 +51,9 @@ namespace MainUI.ViewModels
 			LoadImageCommand = _commandManager.Create( async () => await LoadImageAsync());
 		}
 
+		// All Subscribed methods are get clone image objects to handle good separation between view and model
+		// Assuming that the application can handle this duplicate objects memory, else we need to provide a lot of locks mechanism
+
 		private void SubscribeToEvents()
 		{
 			_brightnessManager.OnBrightnessChanged += async (s, e) => await AdjustBrightness();
@@ -151,7 +154,7 @@ namespace MainUI.ViewModels
 			}
 		}
 
-		private void LoadImage()
+		private void LoadImage()	//Make sure its on MainUI thread
 		{
 			try
 			{
@@ -162,8 +165,8 @@ namespace MainUI.ViewModels
 							{
 								IsLoading = true;
 								EnableBrightnessSlider = false;
-								Image = await _imageLoader.GetImageCloneAsync();
-								OriginalImage = await _imageLoader.GetImageCloneAsync();
+								Image = await _imageLoader.GetImageCloneAsync();	//Assume that App have enough memory to handle
+								OriginalImage = await _imageLoader.GetImageCloneAsync(); //Assume that App have enough memory to handle
 							}
 							catch(Exception ex)
 							{
@@ -187,7 +190,7 @@ namespace MainUI.ViewModels
 			}
 		}
 
-		private void UpdateImage()
+		private void UpdateImage() //Make sure its on MainUI thread
 		{
 			try
 			{
@@ -198,7 +201,7 @@ namespace MainUI.ViewModels
 							{
 								IsLoading = true;
 								EnableBrightnessSlider = false;
-								Image = await _imageLoader.GetImageCloneAsync();
+								Image = await _imageLoader.GetImageCloneAsync(); //Assume that App have enough memory to handle
 							}
 							catch (Exception ex)
 							{
@@ -222,7 +225,7 @@ namespace MainUI.ViewModels
 			}
 		}
 
-		private void UpdateHistogramImage()
+		private void UpdateHistogramImage() //Make sure its on MainUI thread
 		{
 			try
 			{
@@ -231,7 +234,7 @@ namespace MainUI.ViewModels
 					try
 					{
 						IsLoadingHistogram = true;
-						HistogramImage = _histogramManager.GetHistogramImage();
+						HistogramImage = _histogramManager.GetHistogramImage(); //Assume that App have enough memory to handle
 					}
 					catch (Exception ex)
 					{
@@ -264,14 +267,6 @@ namespace MainUI.ViewModels
 		{
 			_imageModel.Dispose();
 			_histogramManager.Dispose();
-		}
-
-		protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
-		{
-			if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-			field = value;
-			OnPropertyChanged(propertyName);
-			return true;
 		}
 	}
 }
