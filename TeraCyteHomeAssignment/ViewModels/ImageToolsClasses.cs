@@ -53,6 +53,9 @@ namespace MainUI.ViewModels
 	public interface IHistogramManager : IDisposable
 	{
 		event EventHandler HistogramUpdated;
+
+		event EventHandler HistogramReadyToSend;
+
 		BitmapSource GetHistogramImage();
 		Task SendHistogramAsync();
 	}
@@ -61,20 +64,28 @@ namespace MainUI.ViewModels
 	{
 		private readonly ImageModel _imageModel;
 		private readonly HistogramSender _histogramSender;
+		private readonly object sendLock = new object();
 
 		public HistogramManager(ImageModel imageModel, string azureFunctionUrl)
 		{
 			_imageModel = imageModel;
 			_histogramSender = new HistogramSender(azureFunctionUrl);
 			_imageModel.HistogramUpdated += OnHistogramUpdated;
+			_imageModel.HistogramReadyToSend += OnHistogramReadyToSend;
 		}
 
 		public event EventHandler HistogramUpdated;
 
+		public event EventHandler HistogramReadyToSend;
+
 		private void OnHistogramUpdated(object sender, EventArgs e)
 		{
 			HistogramUpdated?.Invoke(this, EventArgs.Empty);
-			_ = SendHistogramAsync();
+		}
+
+		private void OnHistogramReadyToSend(object sender, EventArgs e)
+		{
+			HistogramReadyToSend?.Invoke(this,EventArgs.Empty);
 		}
 
 		public BitmapSource GetHistogramImage()
@@ -86,7 +97,10 @@ namespace MainUI.ViewModels
 		{
 			try
 			{
-				await _histogramSender.SendHistogramAsync(_imageModel);
+				lock(sendLock)
+				{
+					_histogramSender.SendHistogramAsync(_imageModel.GetHisotgramByteArray());
+				}
 			}
 			catch (Exception ex)
 			{
@@ -103,8 +117,11 @@ namespace MainUI.ViewModels
 
 	public interface IImageLoader
 	{
-		event EventHandler<BitmapSource> ImageLoaded;
-		Task<BitmapSource> LoadImageAsync();
+		event EventHandler ImageLoaded;
+
+		event EventHandler ImageUpdated;
+		void LoadImage();
+		Task<BitmapSource> GetImageCloneAsync();
 	}
 
 	public class ImageLoader : IImageLoader
@@ -116,11 +133,19 @@ namespace MainUI.ViewModels
 		{
 			_imageModel = imageModel;
 			_logger = logger;
+			_imageModel.ImageLoaded += OnImageLoaded;
 		}
 
-		public event EventHandler<BitmapSource> ImageLoaded;
+		public event EventHandler ImageLoaded;
 
-		public async Task<BitmapSource> LoadImageAsync()
+		public event EventHandler ImageUpdated;
+
+		private void OnImageLoaded(object sender, EventArgs e)
+		{
+			ImageLoaded?.Invoke(this, EventArgs.Empty);
+		}
+
+		public void LoadImage()
 		{
 			var openFileDialog = new OpenFileDialog
 				                     {
@@ -128,59 +153,49 @@ namespace MainUI.ViewModels
 					                     Title = "Select an Image"
 				                     };
 
-			if(openFileDialog.ShowDialog() != true) return null;
+			if (openFileDialog.ShowDialog() != true) 
+				return;
 
 			string fileName = openFileDialog.FileName;
 			string extension = Path.GetExtension(fileName).ToLower();
 
 			try
 			{
-				return await Task.Run(
-					       () =>
-						       {
-							       Mat mat;
-							       if(extension == ".bmp")
-							       {
-								       // Use method for BMP files
-								       mat = Cv2.ImRead(fileName, ImreadModes.Color);
-							       }
-							       else
-							       {
-								       // Use a more robust method for other formats
-								       byte[] fileBytes = File.ReadAllBytes(fileName);
-								       mat = Mat.FromImageData(fileBytes, ImreadModes.Color);
-							       }
-
-							       if(mat.Empty())
-							       {
-								       throw new Exception("Failed to load image.");
-							       }
-
-							       _imageModel.SetMatAndUpdateHistogramAsync(mat.Clone());
-
-							       var bitmapSource = mat.ToBitmapSource();
-							       bitmapSource.Freeze(); // Make it immutable for thread-safety
-
-							       Application.Current.Dispatcher.Invoke(
-								       () => { ImageLoaded?.Invoke(this, bitmapSource); });
-
-							       return bitmapSource;
-						       });
-			}
-			catch(Exception ex)
-			{
-				_logger.LogError($"Error loading image: {ex.Message}\nFile: {fileName}", ex);
-				Application.Current.Dispatcher.Invoke(
+				Task.Run(
 					() =>
 						{
-							MessageBox.Show(
-								$"Error loading image: {ex.Message}\nFile: {fileName}",
-								"Error",
-								MessageBoxButton.OK,
-								MessageBoxImage.Error);
+							Mat mat;
+							if(extension == ".bmp")
+							{
+								// Use method for BMP files
+								mat = Cv2.ImRead(fileName, ImreadModes.Color);
+							}
+							else
+							{
+								// Use a more robust method for other formats
+								byte[] fileBytes = File.ReadAllBytes(fileName);
+								mat = Mat.FromImageData(fileBytes, ImreadModes.Color);
+							}
+
+							if(mat.Empty())
+							{
+								throw new Exception("Failed to load image.");
+							}
+
+							_imageModel.SetMatAndHistogram(mat);
+
 						});
-				return null;
 			}
+			catch(Exception e)
+			{
+				Console.WriteLine(e);
+				throw;
+			}
+		}
+
+		public async Task<BitmapSource> GetImageCloneAsync()
+		{
+			return _imageModel.GetImageClone();
 		}
 	}
 

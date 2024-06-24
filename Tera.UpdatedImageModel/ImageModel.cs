@@ -14,71 +14,50 @@ namespace Tera.UpdatedImageModel
 		public string ImagePath { get; private set; }
 		private Mat _mat;
 		private readonly object _lockObject = new object();
-		private readonly Lazy<ImageHistogramModel> _histogramModel;
+		private readonly ImageHistogramModel _histogramModel;
 
-		public event EventHandler<HistogramUpdatedEventArgs> HistogramUpdated;
+		public event EventHandler HistogramUpdated;
+		public event EventHandler ImageLoaded;
+
+		public event EventHandler HistogramReadyToSend;
 
 		public ImageModel()
 		{
-			_histogramModel = new Lazy<ImageHistogramModel>(() => new ImageHistogramModel());
+			_histogramModel = new ImageHistogramModel();
 		}
 
-		public async Task SetMatAndUpdateHistogramAsync(Mat mat)
+		public void SetMatAndHistogram(Mat mat)
 		{
-			await Task.Run(() =>
-			{
-				lock (_lockObject)
-				{
-					_mat?.Dispose();
-					_mat = mat.Clone();
-				}
-			});
-			await UpdateHistogramAsync();
+			_mat?.Dispose();
+			_mat = mat.Clone();
+			ImageLoaded?.Invoke(this,null);	//Invoke the UI thread and then get the Image clone
+
+			Task.Run(() => UpdateHistogram(mat));	//Go behind to update histogram
 		}
 
-		public async Task UpdateHistogramAsync()
+		public void UpdateHistogram(Mat mat)
 		{
-			BitmapSource histogramImage = null;
-			await Task.Run(() =>
-			{
-				lock (_lockObject)
-				{
-					_histogramModel.Value.CalculateAndCreateHistogram(_mat);
-					histogramImage = _histogramModel.Value.GetHistogramImageClone();
-				}
-			});
-			OnHistogramUpdated(histogramImage);
+			_histogramModel.CalculateAndCreateHistogram(mat);
+			var histogramImage = _histogramModel.GetHistogramImageClone();
+			HistogramUpdated?.Invoke(this,null); //Invoke the UI thread and then get the histogram clone
+
+			_histogramModel.InitializeHistogramByteArray();
+			HistogramReadyToSend?.Invoke(this,null); //STOP HERE
 		}
 
 		public BitmapSource GetCloneHistogram()
 		{
-			lock (_lockObject)
-			{
-				return _histogramModel.Value.GetHistogramImageClone();
-			}
+				return _histogramModel.GetHistogramImageClone();
 		}
 
-		protected virtual void OnHistogramUpdated(BitmapSource histogramImage)
+		public BitmapSource GetImageClone()
 		{
-			HistogramUpdated?.Invoke(this, new HistogramUpdatedEventArgs(histogramImage));
+			return _mat.ToBitmapSource().Clone();
 		}
 
-		public async Task<byte[]> GetHistogramAsByteArrayAsync()
+		public byte[] GetHisotgramByteArray()
 		{
-			BitmapSource histogramSource = GetCloneHistogram();
-			if (histogramSource == null)
-				return null;
-
-			return await Task.Run(() =>
-			{
-				using (var ms = new MemoryStream())
-				{
-					var encoder = new PngBitmapEncoder();
-					encoder.Frames.Add(BitmapFrame.Create(histogramSource));
-					encoder.Save(ms);
-					return ms.ToArray();
-				}
-			});
+			return _histogramModel.GetHistogramBytesArray();
 		}
 
 		public void Dispose()
@@ -94,10 +73,7 @@ namespace Tera.UpdatedImageModel
 				lock (_lockObject)
 				{
 					_mat?.Dispose();
-					if (_histogramModel.IsValueCreated)
-					{
-						_histogramModel.Value.Dispose();
-					}
+					_histogramModel?.Dispose();
 				}
 			}
 		}
@@ -108,21 +84,12 @@ namespace Tera.UpdatedImageModel
 		}
 	}
 
-	public class HistogramUpdatedEventArgs : EventArgs
-	{
-		public BitmapSource HistogramImage { get; }
-
-		public HistogramUpdatedEventArgs(BitmapSource histogramImage)
-		{
-			HistogramImage = histogramImage;
-		}
-	}
-
 	public class ImageHistogramModel : IDisposable
 	{
 		private const int HISTOGRAM_WIDTH = 256;
 		private const int HISTOGRAM_HEIGHT = 200;
 		private BitmapSource _histogramImage = null;
+		private byte[] _histogramByteArray;
 		private readonly object _lockObject = new object();
 
 		public void CalculateAndCreateHistogram(Mat image)
@@ -201,12 +168,37 @@ namespace Tera.UpdatedImageModel
 			}
 		}
 
+		public void InitializeHistogramByteArray()
+		{
+			lock (_lockObject)
+			{
+				if (_histogramImage == null)
+				{
+					_histogramByteArray = null;
+					return;
+				}
+
+				using (var memoryStream = new MemoryStream())
+				{
+					BitmapEncoder encoder = new PngBitmapEncoder();
+					encoder.Frames.Add(BitmapFrame.Create(_histogramImage));
+					encoder.Save(memoryStream);
+					_histogramByteArray = memoryStream.ToArray();
+				}
+			}
+		}
+
 		public BitmapSource GetHistogramImageClone()
 		{
 			lock (_lockObject)
 			{
 				return _histogramImage?.Clone();
 			}
+		}
+
+		public byte[] GetHistogramBytesArray()
+		{
+			return _histogramByteArray;
 		}
 
 		public void Dispose()

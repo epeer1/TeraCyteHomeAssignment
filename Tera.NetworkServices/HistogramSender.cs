@@ -21,42 +21,40 @@ namespace Tera.NetworkServices
 				              };
 		}
 
-		public async Task SendHistogramAsync(ImageModel imageModel)
+		public async Task SendHistogramAsync(byte[] histogramData)
 		{
-			//if (await _semaphore.WaitAsync(0))
-			//{
-			//	try
-			//	{
-			//		byte[] histogramData = imageModel.GetHistogramAsByteArray();
-			//		if (histogramData == null)
-			//			return;
+			if (await _semaphore.WaitAsync(4))
+			{
+				try
+				{
+					if (histogramData == null)
+						return;
 
-			//		using (var content = new ByteArrayContent(histogramData))
-			//		{
-			//			content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-			//			var response = await _httpClient.PostAsync(_azureFunctionUrl, content);
+					using (var content = new ByteArrayContent(histogramData))
+					{
+						content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+						var response = await _httpClient.PostAsync(_azureFunctionUrl, content);
 
-			//			if (!response.IsSuccessStatusCode)
-			//			{
-			//				// Handle error, maybe throw an exception or log the error
-			//				//throw new HttpRequestException($"Error sending histogram: {response.StatusCode}");
-			//				Console.WriteLine("NO CONNECTION YET!");
-			//			}
-			//		}
+						if (!response.IsSuccessStatusCode)
+						{
+							// Handle error, maybe throw an exception or log the error
+							throw new HttpRequestException($"Error sending histogram: {response.StatusCode}");
+						}
+					}
 
-			//		// Throttle
-			//		await Task.Delay(ThrottleMilliseconds);
-			//	}
-			//	finally
-			//	{
-			//		_semaphore.Release();
-			//	}
-			//}
-			//else
-			//{
-			//	// Optionally log that a send operation was skipped due to throttling
-			//	Console.WriteLine("Histogram send operation skipped due to throttling");
-			//}
+					// Throttle
+					await Task.Delay(ThrottleMilliseconds);
+				}
+				finally
+				{
+					_semaphore.Release();
+				}
+			}
+			else
+			{
+				// Optionally log that a send operation was skipped due to throttling
+				Console.WriteLine("Histogram send operation skipped due to throttling");
+			}
 		}
 
 		public void Dispose()

@@ -12,7 +12,7 @@ public class MainViewModel : ViewModelBase
 		var logger = new Logger("application.log");
 		var imageModel = new ImageModel();
 		IBrightnessManager brightnessManager = new BrightnessManager();
-		IHistogramManager histogramManager = new HistogramManager(imageModel, "https://teraimagefunctionapp.azurewebsites.net");
+		IHistogramManager histogramManager = new HistogramManager(imageModel, "https://terafunctionapppyhton.azurewebsites.net");
 		IImageLoader imageLoader = new ImageLoader(imageModel, logger);
 		ICommandManager commandManager = new CommandManager();
 

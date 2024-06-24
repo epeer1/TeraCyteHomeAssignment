@@ -48,19 +48,16 @@ namespace MainUI.ViewModels
 
 		private void InitializeCommands()
 		{
-			LoadImageCommand = _commandManager.Create(async () => await LoadImageAsync());
+			LoadImageCommand = _commandManager.Create( async () => await LoadImageAsync());
 		}
 
 		private void SubscribeToEvents()
 		{
 			_brightnessManager.OnBrightnessChanged += async (s, e) => await AdjustBrightness();
 			_histogramManager.HistogramUpdated += (s, e) => UpdateHistogramImage();
-			_imageLoader.ImageLoaded += (s, loadedImage) =>
-			{
-				Image = loadedImage;
-				OriginalImage = loadedImage;
-				EnableBrightnessSlider = true;
-			};
+			_imageLoader.ImageLoaded += (s, e) => LoadImage();
+			_imageLoader.ImageUpdated += (s, e) => UpdateImage();
+			_histogramManager.HistogramReadyToSend += (s, e) => SendHistogram();
 		}
 
 		public ICommand LoadImageCommand { get; private set; }
@@ -113,7 +110,7 @@ namespace MainUI.ViewModels
 			{
 				IsLoading = true;
 				EnableBrightnessSlider = false;
-				await _imageLoader.LoadImageAsync();
+				_imageLoader.LoadImage();
 			}
 			catch (Exception ex)
 			{
@@ -126,6 +123,8 @@ namespace MainUI.ViewModels
 			}
 		}
 
+
+
 		private async Task AdjustBrightness()
 		{
 			if (OriginalImage != null)
@@ -137,7 +136,7 @@ namespace MainUI.ViewModels
 					{
 						var adjustedMat = await _brightnessManager.AdjustBrightnessAsync(mat);
 						Image = adjustedMat.ToBitmapSource();
-						await Task.Run(() => _imageModel.SetMatAndUpdateHistogramAsync(adjustedMat));
+						await Task.Run(() => _imageModel.UpdateHistogram(adjustedMat));
 					}
 				}
 				catch (Exception ex)
@@ -149,6 +148,77 @@ namespace MainUI.ViewModels
 				{
 					EnableBrightnessSlider = true;
 				}
+			}
+		}
+
+		private void LoadImage()
+		{
+			try
+			{
+				Application.Current.Dispatcher.Invoke(
+					async () =>
+						{
+							try
+							{
+								IsLoading = true;
+								EnableBrightnessSlider = false;
+								Image = await _imageLoader.GetImageCloneAsync();
+								OriginalImage = await _imageLoader.GetImageCloneAsync();
+							}
+							catch(Exception ex)
+							{
+								_logger.LogError("Error updating image on UI thread", ex);
+								MessageBox.Show($"Error updating image: {ex.Message}", "Image Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+							}
+							finally
+							{
+								IsLoading = false;
+								EnableBrightnessSlider = true;
+							}
+						});
+			}
+			catch(Exception ex)
+			{
+				_logger.LogError("Failed to invoke image update on UI thread", ex);
+				Application.Current.Dispatcher.Invoke(() =>
+					{
+						MessageBox.Show("Failed to update image. Please try again.", "Image Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					});
+			}
+		}
+
+		private void UpdateImage()
+		{
+			try
+			{
+				Application.Current.Dispatcher.Invoke(
+					async () =>
+						{
+							try
+							{
+								IsLoading = true;
+								EnableBrightnessSlider = false;
+								Image = await _imageLoader.GetImageCloneAsync();
+							}
+							catch (Exception ex)
+							{
+								_logger.LogError("Error updating image on UI thread", ex);
+								MessageBox.Show($"Error updating image: {ex.Message}", "Image Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+							}
+							finally
+							{
+								IsLoading = false;
+								EnableBrightnessSlider = true;
+							}
+						});
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError("Failed to invoke image update on UI thread", ex);
+				Application.Current.Dispatcher.Invoke(() =>
+					{
+						MessageBox.Show("Failed to update image. Please try again.", "Image Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					});
 			}
 		}
 
@@ -183,6 +253,11 @@ namespace MainUI.ViewModels
 					MessageBox.Show("Failed to update histogram. Please try again.", "Histogram Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
 				});
 			}
+		}
+
+		private void SendHistogram()
+		{
+			_histogramManager.SendHistogramAsync();
 		}
 
 		public void Dispose()
